@@ -1,0 +1,43 @@
+name: Apply Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    environment: Production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-session-name: GitHubActions
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: |
+          aws s3 cp "s3://$PROJECT-terraform-backend/$ENV.s3.tfbackend" "$ENV.s3.tfbackend"
+          terraform init -backend-config="$ENV.s3.tfbackend"
+        env:
+          PROJECT: ${{ secrets.PROJECT }}
+          ENV: prod
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: terraform apply -auto-approve -var region=${{ secrets.AWS_REGION }}
