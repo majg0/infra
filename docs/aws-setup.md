@@ -18,8 +18,11 @@ Follow these steps to securely set up your AWS account:
    - **Note:** Unlike the root account, an IAM user creates audit trails in CloudTrail and can have its access restricted in line with the Principle of Least Privilege (PoLP).
 
 4. **Enable MFA for IAM User**
+
    - Set up MFA for your newly created IAM user for enhanced security.
+
 5. **Use IAM User for Login**
+
    - Prefer logging in as your IAM user for routine operations.
 
 # Integration with GitHub
@@ -65,6 +68,7 @@ Follow these steps to integrate AWS with GitHub using OpenID Connect (OIDC):
      ```
 
 8. **Store AWS Secrets in GitHub**
+
    - In your GitHub repository settings, add secrets for `AWS_REGION` and `AWS_ROLE_ARN`.
    - Set these to your main AWS region and the ARN of the IaC role, respectively.
    - In your GitHub repository settings, add a secret named `PROJECT`.
@@ -96,6 +100,20 @@ Follow these steps to set up and use AWS CLI with Single Sign-On (SSO):
     - Below is an example configuration. Replace `myorg` with your organization's name. If using multiple regions, consider adding region-specific details to your profile and session names.
 
       ```ini
+      [profile myorg-prod-administrator]
+      sso_session = myorg-prod-administrator
+      sso_account_id = 012345678910
+      sso_role_name = AdministratorAccess
+      sso_start_url = https://a-b1234c5d6e.awsapps.com/start
+      sso_region = us-west-1
+      region = us-west-1
+      output = json
+
+      [sso-session myorg-prod-administrator]
+      sso_start_url = https://a-b1234c5d6e.awsapps.com/start
+      sso_region = us-west-1
+      sso_registration_scopes = sso:account:access
+
       [profile myorg-prod-poweruser]
       sso_session = myorg-prod-poweruser
       sso_account_id = 012345678910
@@ -127,12 +145,14 @@ Follow these steps to set up and use AWS CLI with Single Sign-On (SSO):
 
 12. **Login Using AWS CLI SSO**
 
-    - Execute the command `aws sso login --sso-session myorg-prod-poweruser` to log in via AWS CLI.
+    - Source the utility login script, e.g. `source terraform/login.sh eu-west-1 myorg-prod-administrator`, to both log in and set your `AWS_DEFAULT_REGION` and `AWS_DEFAULT_PROFILE` variables.
 
 13. **Troubleshooting CLI Access Issues**
+
     - After logging in, if you encounter an error like `Unable to locate credentials` when running commands (e.g., `aws s3 ls`), it indicates a need to select a profile.
     - Set the `AWS_DEFAULT_PROFILE` environment variable to one of your configured profiles to resolve this, for example, `AWS_DEFAULT_PROFILE=myorg-prod-poweruser`.
-    - It's recommended to get accustomed to setting this variable regularly rather than depending on a non-Principle of Least Privilege (PoLP) default. Create convenient shell aliases for ease of use.
+    - It's recommended to get accustomed to setting this variable regularly rather than depending on a non-Principle of Least Privilege (PoLP) default.
+    - The `terraform/login.sh` and `terraform/logout.sh` scripts manage default region and profile for you, so you shouldn't need to concern yourself with it.
 
 # Further Steps in AWS Setup
 
@@ -156,3 +176,13 @@ After setting up AWS CLI with SSO, here are the final steps to complete your AWS
       ```
 
     - **Congratulations!** With these steps completed, your GitHub setup should now be capable of automatically and securely applying your infrastructure configurations.
+
+# Enabling AWS Systems Manager (SSM)
+
+16. **Perform the SSM Quick Setup**
+
+    - Navigate to the [Quick Setup](https://console.aws.amazon.com/systems-manager/quick-setup) for Host Management and perform it according to your needs. Minimally, check **Update Systems Manager (SSM) Agent every two weeks** and **Update the EC2 launch agent once every 30 days** to keep everything up to date.
+
+17. **Install the Session Manager Plugin**
+
+    - Run the `terraform/install-ssm-mac-amd64.sh` script or follow [AWS's documentation](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html) for your platform.
