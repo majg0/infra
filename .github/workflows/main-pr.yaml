@@ -1,0 +1,55 @@
+name: On PR
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_wrapper: false
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: |
+          aws s3 cp "s3://$PROJECT-terraform-backend/$ENV.s3.tfbackend" "$ENV.s3.tfbackend"
+          terraform init -backend-config="$ENV.s3.tfbackend"
+        env:
+          PROJECT: ${{ secrets.PROJECT }}
+          ENV: prod
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: terraform
+        run: terraform plan -no-color -out=
+        continue-on-error: true
+
+      - name: Comment Plan Output
+        uses: actions/github-script@v4
+        if: ${{ steps.plan.conclusion != 'skipped' }}
+        with:
+          script: |
+            const output = `${{ steps.plan.outputs.stdout }}`
+            const planOutput = output.length ? output : 'No changes'
+            const commentBody = `### Terraform Plan Output\n\`\`\`${planOutput}\`\`\``
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: commentBody
+            })
