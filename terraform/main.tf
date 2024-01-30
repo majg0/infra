@@ -119,19 +119,64 @@ resource "aws_vpc_endpoint" "s3_endpoint" {
 }
 
 #
-# EC2 Instance
+# OpenVPN
 #
 
-resource "aws_instance" "example" {
-  ami           = var.ami
-  instance_type = "t3.micro"
-  subnet_id     = aws_subnet.private.id
+resource "aws_security_group" "ovpn" {
+  vpc_id = aws_vpc.main.id
 
-  # temp
-  associate_public_ip_address = false
+  ingress {
+    from_port   = 1194
+    to_port     = 1194
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = -1 # all
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+resource "aws_instance" "ovpn" {
+  ami           = var.ovpn_ami
+  instance_type = "t3.micro"
+  subnet_id     = aws_subnet.public.id
+  security_groups = [aws_security_group.ovpn.id]
+  user_data = <<-EOF
+#!/bin/bash
+echo bootstrap
+EOF
 
   metadata_options {
     # NOTE: Require the recommended Instance Metadata Service Version 2 (IMDSv2)
     http_tokens   = "required"
   }
 }
+
+resource "aws_eip" "ovpn" {
+  domain = "vpc"
+  depends_on = [aws_internet_gateway.gw]
+}
+
+resource "aws_eip_association" "ovpn" {
+  instance_id = aws_instance.ovpn.id
+  allocation_id = aws_eip.ovpn.id
+}
+
+#
+# EC2 Instance
+#
+
+# resource "aws_instance" "example" {
+#   ami           = var.ami
+#   instance_type = "t3.micro"
+#   subnet_id     = aws_subnet.private.id
+# 
+#   metadata_options {
+#     # NOTE: Require the recommended Instance Metadata Service Version 2 (IMDSv2)
+#     http_tokens   = "required"
+#   }
+# }
